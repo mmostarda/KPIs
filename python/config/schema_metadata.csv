@@ -1,0 +1,72 @@
+column;label;tab;section;type;choices_sheet;choices_column;choices;min;max;default;required;lola_policy;in_kpi_table;notes
+ID;ID;General;ID & References;id;;;;;;;;;yes;Assegnato automaticamente (max ID + 1)
+IDName;ID Name;General;ID & References;text;;;;;;;;;yes;
+Date;Date;General;ID & References;date;;;;;;;;;yes;Dedotta dal nome file se l opzione e attiva
+Cluster;Cluster;General;ID & References;choice;Cluster;Cluster;;;;;;;;
+Sub_Cluster;SubCluster;General;ID & References;choice;SubCluster;SubCluster;;;;;;;;
+RefFolder;Ref Folder (link);General;ID & References;text;;;;;;;;;;
+Results_Category;Results Category;General;ID & References;text;;;;;;;;;;
+Brand;Brand;General;Vehicle;choice;Brand;Brand;;;;;;;;
+Model;Model;General;Vehicle;choice;Model;Model;;;;;;;;
+Specs;Vehicle specs;General;Vehicle;text;;;;;;;;;;
+VIN;VIN;General;Vehicle;text;;;;;;;;;;
+RefName;Reference Name;General;Vehicle;text;;;;;;;;;;
+ManeuvreName;Maneuvre Name;General;Maneuvre & Environment;choice;Maneuvre;Maneuvre;;;;;;;;Dedotto dal nome file se l opzione e attiva
+StartSpeed;Start Speed;General;Maneuvre & Environment;number;;;;0;300;;;keep_if_valid;;Se l output LoLa contiene un valore numerico, vince quello
+EndSpeed;End Speed;General;Maneuvre & Environment;number;;;;0;200;;;;;
+Repetition_ID;Repetition # ID;General;Maneuvre & Environment;int;;;;0;300;;;keep;;Dalla colonna A dell output LoLa
+Track;Track;General;Maneuvre & Environment;text;;;;;;;;;;
+Surface;Road Surface;General;Maneuvre & Environment;choice;Surface;Surface;;;;;;;;
+Condition;Condition (dry, wet..);General;Maneuvre & Environment;choice;Condition;Condition;;;;;;;;
+Road_mu_coeff;Road mu coeff;General;Maneuvre & Environment;number;;;;0;300;;;;;Limiti copiati dall app MATLAB (0-300): da confermare
+Driving_Mode;Driving Mode;General;Vehicle settings;text;;;;;;;;;;Dedotto dal nome file se l opzione e attiva
+ABS;ABS;General;Vehicle settings;choice;;;ON|OFF;;;ON;;;;
+ESC;ESC;General;Vehicle settings;choice;;;ON|OFF;;;ON;;;;
+TCS;TCS;General;Vehicle settings;choice;;;ON|OFF;;;ON;;;;
+T_Front_Name;Tire Front Name;General;Tires;text;;;;;;;;;;
+T_Rear_Name;Tire Rear Name;General;Tires;text;;;;;;;;;;
+T_Front_type;Tire Front Type;General;Tires;choice;Tire;Tire;;;;;;;;
+T_Rear_type;Tire Rear Type;General;Tires;choice;Tire;Tire;;;;;;;;
+FileName;File Name;General;ID & References;text;;;;;;;;keep;;Dall output LoLa (colonna File Name)
+MassInfo;Mass (DOVW, #P);General;Vehicle;text;;;;;;;;;;
+Driver;Driver;General;Maneuvre & Environment;text;;;;;;;;;;Dedotto dal nome file se l opzione e attiva
+B_F_System;Brake Front System;IC;Brake System;text;;;;;;;;;;
+B_F_BL;BL Front;IC;Brake System;text;;;;;;;;;;
+B_F_Cal_Date;Front calibration date;IC;Brake System;date;;;;;;;;;;
+B_F_Cal_ID;CAL ID (Front);IC;Brake System;number;;;;;;;;;;
+B_F_Type;Brake Front Type;IC;Brake System;choice;Brake;BrakeType;;;;;;;;
+B_R_System;Brake Rear System;IC;Brake System;text;;;;;;;;;;
+B_R_BL;BL Rear;IC;Brake System;text;;;;;;;;;;
+B_R_Type;Brake Rear Type;IC;Brake System;choice;Brake;BrakeType;;;;;;;;
+B_R_Cal_Date;Rear calibration date;IC;Brake System;date;;;;;;;;;;
+B_R_Cal_ID;CAL ID (Rear);IC;Brake System;number;;;;;;;;;;
+Su_System;Susp System;IC;Suspensions;text;;;;;;;;;;
+Su_Type;Susp Type;IC;Suspensions;choice;Susp;SuspActiveStatus;;;;;;;;
+Su_Mode;Susp Mode;IC;Suspensions;text;;;;;;;;;;
+Su_BL_Cal_Date;Susp BL Calib Date;IC;Suspensions;date;;;;;;;;;;
+Su_Cal_ID;CAL ID (Susp);IC;Suspensions;number;;;;;;;;;;
+Su_BL;Susp BL;IC;Suspensions;text;;;;;;;;;;
+SmT_Type;Smart Tire Type;IC;Smart Tire;text;;;;;;;;;;
+SmT_BL_Cal_Date;Smart Tire BL Cal. Date;IC;Smart Tire;date;;;;;;;;;;
+SmT_BL;Smart Tire BL;IC;Smart Tire;text;;;;;;;;;;
+SmT_Cal_ID;CAL ID (Smart Tire);IC;Smart Tire;number;;;;;;;;;;
+St_Type;Steering Type;IC;Steering;choice;Steer;SteeringType;;;;;;;;
+St_Cal_Date;Steering BL Cal Date;IC;Steering;date;;;;;;;;;;
+St_BL;Steering BL;IC;Steering;text;;;;;;;;;;
+St_Cal_ID;CAL ID (Steering);IC;Steering;number;;;;;;;;;;
+St_Mode;Steering Mode;IC;Steering;text;;;;;;;;;;
+CoOpType;CoOperation type;IC;CoOperation;multichoice;;;Brake|Susp|Tire|Steer;;;;;;;Valori separati da punto e virgola, come nell app MATLAB
+CoOpBL_Cal_Date;CoOperation BL Cal Date;IC;CoOperation;date;;;;;;;;;;
+CoOpBL;CoOperation BL;IC;CoOperation;text;;;;;;;;;;
+CoOp_Cal_ID;CAL ID (CoOperation);IC;CoOperation;number;;;;;;;;;;
+B_F_BL_Phase;Brake Front BL Phase;IC;Brake System;choice;BL_Phase;Phase;;;;;;;;
+B_R_BL_Phase;Brake Rear BL Phase;IC;Brake System;choice;BL_Phase;Phase;;;;;;;;
+T_Front_Pressure;Tire Front Pressure;General;Tires;text;;;;;;;;;;Campo testo come nell app MATLAB
+T_Rear_Pressure;Tire Rear Pressure;General;Tires;text;;;;;;;;;;Campo testo come nell app MATLAB
+T_Front_Thread_Depth;Tire Front Thread Dep;General;Tires;text;;;;;;;;;;Campo testo come nell app MATLAB
+T_Rear_Thread_Depth;Tire Rear Thread Dep;General;Tires;text;;;;;;;;;;Campo testo come nell app MATLAB
+SmT_SW_Version;Smart Tire SW Ver;IC;Smart Tire;text;;;;;;;;;;
+SmT_SW_TireID;Smart Tire SW TireID;IC;Smart Tire;choice;SmT_SW_TireID;TireID;;;;;;;;
+SmT_SW_Road;Smart Tire SW Road;IC;Smart Tire;choice;SmT_SW_Estimate;Condition;;;;;;;;
+SmT_SW_Wear;Smart Tire SW Wear;IC;Smart Tire;choice;SmT_SW_Estimate;Condition;;;;;;;;
+SmT_SW_Mass;Smart Tire SW Mass;IC;Smart Tire;choice;SmT_SW_Estimate;Condition;;;;;;;;

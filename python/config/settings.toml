@@ -1,0 +1,65 @@
+# Impostazioni di kpimeta.
+# I valori di default replicano il comportamento dell'app MATLAB IC_KPIs_App.
+# I percorsi relativi sono risolti rispetto a questa cartella (config/).
+
+[paths]
+schema = "schema_metadata.csv"
+# Mapping LoLa -> DB. Crealo con:  python -m kpimeta convert-mapping Mapping_LoLa_DB_mapping.mat -o config/lola_mapping.csv
+lola_mapping = "lola_mapping.csv"
+
+[db]
+# Nomi di fogli e tabelle Excel (ListObject) usati dall'app MATLAB e letti da Power BI.
+metadata_sheet = "Metadata"
+metadata_table = "TableMet"
+kpi_sheet = "KPIs"
+kpi_table = "TableKPI"
+id_column = "ID"
+templates_sheet = "Metadata_Templates"
+template_id_column = "ID_Template"
+template_name_column = "IDName_Template"
+
+# Come scrivere le colonne di tipo data nel DB:
+#   "text"  -> testo "gg/mm/aaaa" (quello che il flusso di import MATLAB voleva scrivere)
+#   "excel" -> data Excel vera, con formato cella gg/mm/aaaa
+date_storage = "text"
+date_text_format = "%d/%m/%Y"
+
+# true = come MATLAB: Metadata e KPIs devono avere gli stessi ID nello stesso ordine.
+# false = basta che contengano gli stessi ID (l'ordine diverso diventa un avviso).
+strict_row_order = true
+
+# true  = un valore che non compare nel foglio di supporto (Cluster, Brand, ...) blocca la scrittura
+# false = solo avviso (nell'app MATLAB questi campi non erano validati)
+strict_choices = false
+
+# Rifiuta la scrittura se il DB risulta aperto in Excel (file di lock ~$ o file bloccato).
+refuse_if_open = true
+
+# Cartella dei backup automatici fatti prima di ogni scrittura.
+# Vuoto = cartella locale dell'utente (Windows: %LOCALAPPDATA%\kpimeta\backups).
+# Sconsigliato metterla dentro la cartella letta da Power BI.
+backup_dir = ""
+
+[kpi]
+# Colonne di un file importato che non sono mai KPI (colonne proprie dei template).
+excluded_columns = ["ID_Template", "IDName_Template"]
+
+[filename]
+# Regola attuale (MATLAB): X_X_Data_X_DrivingMode_Maneuvre_Driver_X.mf4, token separati da "_".
+separator = "_"
+min_tokens = 7
+# Formato del token data nel nome file (AAAAMMGG).
+date_format = "%Y%m%d"
+# I primi N token formano il nome del template (confrontato con IDName_Template).
+template_tokens = 2
+
+[filename.tokens]
+# colonna del DB = posizione del token nel nome file (1 = primo token)
+Date = 3
+Driving_Mode = 5
+ManeuvreName = 6
+Driver = 7
+
+[lola]
+# Intestazione della colonna con il nome del log nell'output LoLa.
+filename_header = "File Name"

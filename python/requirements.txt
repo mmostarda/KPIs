@@ -1,0 +1,8 @@
+# kpimeta: testato con Python 3.11, pandas 2.2.3 e 3.0.6, openpyxl 3.1.5, streamlit 1.64.0
+pandas>=2.2
+openpyxl>=3.1
+# la revisione a griglia conta sull'identità stabile di st.data_editor delle versioni recenti
+streamlit>=1.64
+tomli>=2; python_version < "3.11"
+# solo per convertire il mapping .mat (python -m kpimeta convert-mapping)
+scipy>=1.10
