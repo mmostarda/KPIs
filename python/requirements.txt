@@ -1,4 +1,4 @@
-# kpimeta: testato con Python 3.11, pandas 2.2.3 e 3.0.6, openpyxl 3.1.5, streamlit 1.64.0
+# kpimeta: testato con Python 3.10-3.13, pandas 2.2.3 e 3.0.6, openpyxl 3.1.5, streamlit 1.64.0
 pandas>=2.2
 openpyxl>=3.1
 # la revisione a griglia conta sull'identità stabile di st.data_editor delle versioni recenti

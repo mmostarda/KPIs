@@ -12,14 +12,20 @@ L'app MATLAB resta nella cartella superiore e non è stata modificata.
 
 ## Installazione (Windows)
 
-Serve Python 3.11 o superiore.
+Serve Python 3.10 o superiore (testato con 3.10, 3.11, 3.12 e 3.13). `py -0` elenca le versioni installate.
 
-```bat
+In PowerShell:
+
+```powershell
 cd python
-py -3.11 -m venv .venv
-.venv\Scripts\activate
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
+
+- Se PowerShell blocca `Activate.ps1` ("esecuzione di script disabilitata"), esegui una volta `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+- Nel Prompt dei comandi (cmd) l'attivazione è `.venv\Scripts\activate.bat`.
+- Se è già attivo un altro ambiente (il prompt inizia con `(.venv)`), esegui prima `deactivate`.
 
 ## Primo avvio
 
