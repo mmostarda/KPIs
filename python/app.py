@@ -1,7 +1,7 @@
 """Interfaccia grafica di kpimeta.
 
 Avvio (dalla cartella python/):   streamlit run app.py
-Flusso: 1 DB -> 2 Sorgente -> 3 Metadati comuni -> 4 Revisione -> 5 Scrittura
+Flusso: 1 DB -> 2 Sorgente -> 3 Metadati -> 4 Revisione -> 5 Scrittura
 """
 
 from __future__ import annotations
@@ -23,13 +23,13 @@ from kpimeta.lola import LolaError, export_all_db, is_lola_output, read_lola_fil
 from kpimeta.mapping import MappingError, load_mapping
 from kpimeta.schema import load_schema
 from kpimeta.ui_helpers import (PROBLEMS_COL, SOURCE_COL, apply_edits, batch_excel_bytes, diff_frame,
-                                display_frame, field_value, form_defaults, issues_frame, one_row_excel_bytes,
-                                problems_text, values_to_widgets, widget_key)
+                                display_frame, field_value, form_defaults, issues_frame, missing_support_values,
+                                one_row_excel_bytes, problems_text, values_to_widgets, widget_key)
 from kpimeta.validate import (KpiDecision, canonicalize_choices, check_decisions, duplicates_vs_db,
                               internal_duplicates, kpi_resolution, validate_batch)
 from kpimeta.values import is_missing, to_text
 
-STEPS = ["1 · DB", "2 · Sorgente", "3 · Metadati comuni", "4 · Revisione", "5 · Scrittura"]
+STEPS = ["1 · DB", "2 · Sorgente", "3 · Metadati", "4 · Revisione", "5 · Scrittura"]
 SOURCES = {
     "lola": "Output LoLa",
     "excel": "Excel Metadata + KPI",
@@ -68,7 +68,7 @@ def init_state() -> None:
         "result": None, "form_ready": False, "form_mode": "overwrite", "infer_filename": True,
         "infer_template": False, "manual_kpis": [], "manual_new_kpis": "", "flash": [],
         "clear_empty_fields": False, "template_choice": "", "form_import_path": "", "edit_id_input": 1,
-        "export_all_db": False,
+        "export_all_db": False, "problem_cols_only": False,
     }
     for key, value in defaults.items():
         ss.setdefault(key, value)
@@ -175,7 +175,7 @@ def browse_into(key: str, kind: str) -> None:
 
 
 def path_input(label: str, key: str, kind: str = "file", placeholder: str = "") -> str:
-    cols = st.columns([8, 1]) if can_browse() else [st.container()]
+    cols = st.columns([8, 1], vertical_alignment="bottom") if can_browse() else [st.container()]
     cols[0].text_input(label, key=key, placeholder=placeholder)
     if can_browse():
         cols[1].button("Sfoglia…", key=f"browse::{key}", on_click=browse_into, args=(key, kind))
@@ -185,13 +185,13 @@ def path_input(label: str, key: str, kind: str = "file", placeholder: str = "") 
 def nav(back: int | None = None, forward: int | None = None, label: str = "Avanti →",
         disabled: bool = False, on_forward=None, on_back=None) -> None:
     st.divider()
-    left, right, _ = st.columns([1, 2, 5])
+    row = st.container(horizontal=True)
     if back is not None:
-        left.button("← Indietro", key=f"back::{ss.step}", on_click=on_back or goto,
-                    args=() if on_back else (back,))
+        row.button("← Indietro", key=f"back::{ss.step}", on_click=on_back or goto,
+                   args=() if on_back else (back,))
     if forward is not None:
-        right.button(label, key=f"next::{ss.step}", type="primary", disabled=disabled,
-                     on_click=on_forward or goto, args=() if on_forward else (forward,))
+        row.button(label, key=f"next::{ss.step}", type="primary", disabled=disabled,
+                   on_click=on_forward or goto, args=() if on_forward else (forward,))
 
 
 def require_db() -> bool:
@@ -218,7 +218,7 @@ def step_db() -> None:
             st.markdown(
                 "1. **DB**: colleghi il file Excel del DB (viene solo letto).\n"
                 "2. **Sorgente**: output LoLa, un Excel Metadata + KPI, un nuovo test o la modifica di un ID.\n"
-                "3. **Metadati comuni**: form con template, liste del DB e deduzione dal nome file.\n"
+                "3. **Metadati**: form con template, liste del DB e deduzione dal nome file.\n"
                 "4. **Revisione**: tabella modificabile con i problemi evidenziati riga per riga.\n"
                 "5. **Scrittura**: controlli finali, backup automatico e una sola scrittura atomica.")
         return
@@ -259,6 +259,7 @@ def reset_batch() -> None:
     ss.batch = None
     ss.view_rows = None
     ss.review_cols = None
+    ss.problem_cols_only = False
     ss.editor_version += 1
     ss.result = None
 
@@ -380,8 +381,9 @@ def load_edit_record() -> None:
 
 
 def source_edit() -> None:
-    st.number_input("ID da modificare", min_value=1, step=1, key="edit_id_input")
-    st.button("Carica nel form", on_click=load_edit_record)
+    row = st.columns([2, 2, 6], vertical_alignment="bottom")
+    row[0].number_input("ID da modificare", min_value=1, step=1, key="edit_id_input")
+    row[1].button("Carica nel form", on_click=load_edit_record)
     show_flash()
     record = ss.edit_record
     if record is not None:
@@ -462,23 +464,30 @@ def compose_and_review() -> None:
     ss.batch = batch
     ss.view_rows = None
     ss.review_cols = None  # visible columns recomputed for the new batch
+    ss.problem_cols_only = False
     ss.editor_version += 1
     goto(3)
 
 
-def add_value_popover(field) -> None:
+def add_value_popover(field, label: str = "+", value: str = "", scope: str = "form") -> None:
+    """Add a value to the support sheet of a choice field. In the form the new value is
+    selected; in the review (`value` prefilled) the rows are checked again."""
     support = snapshot().support.get((field.choices_sheet, field.choices_column))
     if support is None or support.problem:
         return
-    with st.popover("+", help=f"Aggiungi un valore al foglio {field.choices_sheet} del DB"):
+    with st.popover(label, help=f"Aggiungi un valore al foglio {field.choices_sheet} del DB",
+                    key=f"pop::{scope}::{field.column}"):
         values = {}
         for i, header in enumerate(support.headers):
             if i == 0 and header != support.header:
                 st.caption(f"{header}: assegnato automaticamente")
                 continue
-            values[header] = st.text_input(header, key=f"add::{field.column}::{header}")
-        if st.button("Aggiungi al DB", key=f"addbtn::{field.column}", type="primary"):
-            if not (values.get(support.header) or "").strip():
+            # default value, not session state: the content of a popover is created only when it opens
+            values[header] = st.text_input(header, value=value if header == support.header else "",
+                                           key=f"add::{scope}::{field.column}::{header}")
+        if st.button("Aggiungi al DB", key=f"addbtn::{scope}::{field.column}", type="primary"):
+            new_value = (values.get(support.header) or "").strip()
+            if not new_value:
                 st.error(f"Indica un valore per {support.header}")
                 return
             try:
@@ -486,7 +495,10 @@ def add_value_popover(field) -> None:
                     add_support_value(snapshot().path, field.choices_sheet,
                                       {k: v for k, v in values.items() if v.strip()}, settings)
                 connect(str(snapshot().path))
-                ss[f"pending::{widget_key(field.column)}"] = values[support.header].strip()
+                if scope == "form":
+                    ss[f"pending::{widget_key(field.column)}"] = new_value
+                else:
+                    flash("success", f"'{new_value}' aggiunto al foglio {field.choices_sheet}")
                 st.rerun()
             except DBError as exc:
                 st.error(str(exc))
@@ -521,12 +533,11 @@ def render_field(field, locked: str | None) -> None:
         current = ss.get(key, "")
         if current and current not in choices:
             choices.append(current)
-        inner = st.columns([5, 1]) if field.uses_support_sheet else [st.container()]
+        inner = st.columns([5, 1], vertical_alignment="bottom") if field.uses_support_sheet else [st.container()]
         inner[0].selectbox(field.label, choices, key=key, help=help_text, disabled=disabled,
                            format_func=lambda v: v if v in known or not v else f"{v} (non in lista)")
         if field.uses_support_sheet:
             with inner[1]:
-                st.write("")
                 add_value_popover(field)
     elif field.type == "multichoice":
         current = [v for v in ss.get(key, []) if v not in field.choices]
@@ -534,7 +545,7 @@ def render_field(field, locked: str | None) -> None:
 
 
 def step_form() -> None:
-    st.header("3 · Metadati comuni")
+    st.header("3 · Metadati")
     if not require_db():
         return
     if ss.source != "edit" and ss.base is None:
@@ -548,18 +559,17 @@ def step_form() -> None:
         ss[key.removeprefix("pending::")] = ss.pop(key)
 
     source = ss.source
-    bar = st.columns([3, 3, 2])
-    with bar[0]:
-        chosen = st.selectbox("Template (Metadata_Templates)", ["", *template_names()], key="template_choice")
-        st.button("Applica template al form", disabled=not chosen, on_click=apply_template, args=(chosen,))
-    with bar[1]:
-        st.text_input("Importa i valori da un Excel di una riga", key="form_import_path")
-        st.button("Importa nel form", disabled=not ss.form_import_path,
+    bar = st.columns([3, 2, 3, 2], vertical_alignment="bottom")
+    chosen = bar[0].selectbox("Template (Metadata_Templates)", ["", *template_names()], key="template_choice")
+    bar[1].button("Applica template", disabled=not chosen, on_click=apply_template, args=(chosen,),
+                  width="stretch")
+    bar[2].text_input("Importa i valori da un Excel di una riga", key="form_import_path")
+    bar[3].button("Importa nel form", disabled=not ss.form_import_path, width="stretch",
                   on_click=import_form_row, args=(ss.form_import_path.strip().strip('"'),))
-    with bar[2]:
-        st.download_button("Scarica il form come Excel", one_row_excel_bytes(form_values()),
-                           file_name="metadati_form.xlsx")
-        st.button("Svuota il form", on_click=clear_form)
+    actions = st.container(horizontal=True)
+    actions.download_button("Scarica il form come Excel", one_row_excel_bytes(form_values()),
+                            file_name="metadati_form.xlsx")
+    actions.button("Svuota il form", on_click=clear_form)
     show_flash()
 
     if source in ("lola", "excel"):
@@ -630,6 +640,21 @@ def toggle_problem_rows() -> None:
             flash("info", "Nessuna riga con problemi.")
     else:
         ss.view_rows = None
+
+
+def toggle_problem_columns() -> None:
+    commit_edits()
+    if ss.problem_cols_only:
+        ss.review_cols = None  # back to the default columns
+        ss.problem_cols_only = False
+        return
+    with_issue = {i.column for i in batch_issues(ss.batch) if i.column and i.severity in (ERROR, WARNING)}
+    columns = [c for c in ss.batch.review_columns() if c in with_issue]
+    if columns:
+        ss.review_cols = columns
+        ss.problem_cols_only = True
+    else:
+        flash("info", "Nessuna colonna con problemi.")
 
 
 def accept_invalid_as_empty() -> None:
@@ -712,16 +737,18 @@ def step_review() -> None:
     c[2].metric("Avvisi", n_warn)
     c[3].metric("Colonne KPI", len(current.kpi_columns))
 
-    actions = st.columns(4)
-    actions[0].button("Mostra tutte le righe" if ss.view_rows is not None else "Mostra solo righe con problemi",
-                      on_click=toggle_problem_rows)
-    actions[1].button("Accetta come vuoti i valori non validi", on_click=accept_invalid_as_empty,
-                      disabled=not current.conv_issues,
-                      help="Svuota le celle con valori non interpretabili (es. 'n.a.' in un KPI)")
-    actions[2].download_button("Scarica Excel (formato Metadata_ALL_DB)", batch_excel_bytes(current),
-                               file_name="Metadata_ALL_DB.xlsx",
-                               help="Per chi vuole ancora modificare in Excel: il file si reimporta "
-                                    "con la sorgente 'Excel Metadata + KPI'")
+    actions = st.container(horizontal=True)
+    actions.button("Mostra tutte le righe" if ss.view_rows is not None else "Mostra solo righe con problemi",
+                   on_click=toggle_problem_rows)
+    actions.button("Mostra le colonne predefinite" if ss.problem_cols_only else "Mostra solo colonne con problemi",
+                   on_click=toggle_problem_columns)
+    actions.button("Accetta come vuoti i valori non validi", on_click=accept_invalid_as_empty,
+                   disabled=not current.conv_issues,
+                   help="Svuota le celle con valori non interpretabili (es. 'n.a.' in un KPI)")
+    actions.download_button("Scarica Excel (formato Metadata_ALL_DB)", batch_excel_bytes(current),
+                            file_name="Metadata_ALL_DB.xlsx",
+                            help="Per chi vuole ancora modificare in Excel: il file si reimporta "
+                                 "con la sorgente 'Excel Metadata + KPI'")
     show_flash()
 
     all_columns = current.review_columns()
@@ -738,6 +765,18 @@ def step_review() -> None:
     st.data_editor(display, key=editor_key(), num_rows="fixed", column_config=column_config(current),
                    column_order=[PROBLEMS_COL, *[c for c in all_columns if c in chosen], *extra],
                    height=min(600, 38 + 35 * len(display)), placeholder="—")
+    missing = missing_support_values(issues, schema, options())
+    if missing:
+        with st.container(border=True):
+            st.markdown("**Valori non presenti nei fogli di supporto del DB**")
+            st.caption("Aggiungili qui al foglio: le righe vengono ricontrollate subito, senza tornare al passo 3.")
+            for (column, value), rows in missing.items():
+                field = schema.get(column)
+                line = st.container(horizontal=True, vertical_alignment="center")
+                line.markdown(f"`{column}` = `{value}` · righe {', '.join(str(r + 1) for r in rows)}")
+                with line:
+                    add_value_popover(field, label=f"Aggiungi al foglio {field.choices_sheet}", value=value,
+                                      scope=f"review::{value}")
     if issues:
         with st.expander(f"Elenco problemi ({len(issues)})", expanded=n_err > 0):
             st.dataframe(issues_frame(issues), hide_index=True)
@@ -784,6 +823,7 @@ def reset_all() -> None:
     for key in ("base", "batch", "view_rows", "edit_record", "edit_values", "result", "source_report",
                 "review_cols"):
         ss[key] = None
+    ss.problem_cols_only = False
     ss.editor_version += 1
     goto(1)
 
@@ -852,9 +892,9 @@ def step_write() -> None:
     if unknown:
         st.subheader("KPI non presenti in TableKPI")
         st.caption("Scegli per ciascuno: nuova colonna, colonna esistente oppure scarta.")
-        b = st.columns(3)
-        b[0].button("Tutti: nuova colonna", on_click=set_all_decisions, args=(ADD, unknown))
-        b[1].button("Tutti: scarta", on_click=set_all_decisions, args=(DISCARD, unknown))
+        b = st.container(horizontal=True)
+        b.button("Tutti: nuova colonna", on_click=set_all_decisions, args=(ADD, unknown))
+        b.button("Tutti: scarta", on_click=set_all_decisions, args=(DISCARD, unknown))
         choices = [CHOOSE, ADD, DISCARD, *[MAP + k for k in snap.kpi_names]]
         for name in unknown:
             ss.setdefault(f"kpi::{name}", MAP + suggestions[name] if name in suggestions else CHOOSE)

@@ -168,7 +168,7 @@ def scan_package(path: str | Path) -> PackageScan:
         name_set = set(names)
         if "xl/workbook.xml" not in name_set:
             raise DBError(invalid_file_message(path))
-        parts ={label: sum(1 for n in names if re.search(pattern, n)) for label, pattern in _PART_CATEGORIES}
+        parts = {label: sum(1 for n in names if re.search(pattern, n)) for label, pattern in _PART_CATEGORIES}
         custom = [n for n in names if n.startswith("customXml/") and n.endswith(".xml")
                   and "/_rels/" not in n]
         power_query = any(b"DataMashup" in archive.read(n) for n in custom)

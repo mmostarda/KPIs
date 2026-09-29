@@ -147,6 +147,22 @@ def problems_text(issues: list[Issue]) -> dict[int, str]:
     return {row: " | ".join(messages) for row, messages in by_row.items()}
 
 
+def missing_support_values(issues: list[Issue], schema: Schema,
+                           options: dict[str, list[str]]) -> dict[tuple[str, str], list[int]]:
+    """(column, value) -> rows, for the choice values missing from their support sheet in the DB."""
+    out: dict[tuple[str, str], list[int]] = {}
+    for issue in issues:
+        f = schema.get(issue.column) if issue.column else None
+        value = to_text(issue.value)
+        if f is None or f.type != "choice" or not f.uses_support_sheet or not value or issue.row is None:
+            continue
+        if value not in options.get(f.column, []):
+            rows = out.setdefault((f.column, value), [])
+            if issue.row not in rows:
+                rows.append(issue.row)
+    return out
+
+
 def issues_frame(issues: list[Issue]) -> pd.DataFrame:
     order = {ERROR: 0, WARNING: 1, INFO: 2}
     ordered = sorted(issues, key=lambda i: (order.get(i.severity, 3), i.row if i.row is not None else -1))
