@@ -4,3 +4,4 @@ __pycache__/
 venv/
 # file temporanei di una scrittura interrotta (vengono rimossi in automatico)
 .kpimeta-tmp-*
+dist/
