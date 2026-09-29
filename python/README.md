@@ -75,6 +75,30 @@ I dati demo sono **sintetici**: servono a provare lo strumento, non a validarlo.
 5. Punta una copia del report Power BI alla copia del DB e aggiorna. Verifica tipi (per esempio `Date`) e relazioni.
 6. Confronta con MATLAB. Passa gli stessi file LoLa nell'app MATLAB e in `python -m kpimeta lola file1.xlsx file2.xlsx -m config\lola_mapping.csv -o ALL_DB.xlsx`. Le differenze attese sono i decimali completi (MATLAB li troncava) e le colonne con "date"/"data" nel nome non più svuotate.
 
+## Distribuire l'app ai colleghi
+
+Non serve compilare nulla e non serve un server. Si crea una **cartella portatile** che contiene un suo Python, le librerie e l'app.
+
+Ogni collega:
+1. la copia sul proprio PC;
+2. fa doppio clic su `Avvia KPI metadata.bat`.
+
+L'app gira sul PC del collega e il browser si collega solo a quel PC (`http://localhost:8501`). Non ci sono link da condividere né porte aperte sulla rete, e non servono installazioni né permessi di amministratore.
+
+Per creare la cartella, sul tuo PC:
+
+```powershell
+cd python
+py build_portable.py
+```
+
+- **Python da usare:** lo script copia il Python con cui lo lanci, senza i pacchetti installati. Deve essere un Python di python.org; quello del Microsoft Store o di Anaconda viene rifiutato con un messaggio. Le librerie vengono scaricate da PyPI come con `pip install`.
+- **Risultato:** `dist\KPI_metadata\` e `dist\KPI_metadata.zip`, di qualche centinaio di MB (lo zip è circa un terzo).
+- **Configurazione:** `config\` viene copiata così com'è, con `settings.toml`, lo schema e soprattutto `lola_mapping.csv`. Aggiornala prima del build.
+- **Distribuzione:** metti lo zip in una cartella condivisa. Ogni collega lo estrae sul proprio PC e segue `LEGGIMI.txt`, che è nella cartella.
+- **Nuova versione:** rifai il build e ridistribuisci lo zip. Preferenze e backup di ciascuno restano in `%LOCALAPPDATA%\kpimeta`.
+- **Riga di comando:** c'è anche `kpimeta.bat`, per esempio `kpimeta.bat doctor percorso\DB.xlsx`.
+
 ## Il flusso dell'app
 
 | Passo | Cosa fa |
@@ -196,6 +220,7 @@ Una riga per ogni metadato, nello stesso ordine di `TableMet`. È ricavato dalle
 | `kpimeta/values.py` | Conversioni di tipo (unica regola per numeri, date e valori mancanti) | `sanitizeKpiValue.m` e le conversioni sparse |
 | `kpimeta/schema.py`, `config.py` | Schema e impostazioni | Mappe dei campi nell'app |
 | `kpimeta/cli.py`, `demo.py` | Riga di comando e dati demo | – |
+| `build_portable.py` | Cartella portatile da distribuire ai colleghi | `App_Compiler.m` |
 
 ## Test
 
