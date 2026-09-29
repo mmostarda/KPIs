@@ -76,9 +76,9 @@ def validate_batch(batch: Batch, schema: Schema, settings: Settings,
                     issues.append(Issue(ERROR, f"{value:g} è maggiore del massimo {f.max:g}", row, column, value))
             elif f.type == "choice" and allowed and value not in allowed:
                 strict = bool(f.choices) or settings.strict_choices
-                where = f"foglio {f.choices_sheet}" if f.uses_support_sheet else "lista"
+                where = f"nel foglio {f.choices_sheet}" if f.uses_support_sheet else "nella lista"
                 issues.append(Issue(ERROR if strict else WARNING,
-                                    f"'{value}' non è nella {where}", row, column, value))
+                                    f"'{value}' non è {where}", row, column, value))
             elif f.type == "multichoice" and allowed:
                 unknown = [t for t in split_multi(value) if t not in allowed]
                 if unknown:

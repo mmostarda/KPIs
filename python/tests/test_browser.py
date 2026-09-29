@@ -129,7 +129,7 @@ def test_grid_edit_reaches_the_db(server, demo):
             page.get_by_label("Template (Metadata_Templates)").first.click()
             page.get_by_role("option", name="PRJ1_VEH1").click()
             _idle(page)
-            _click(page, "Applica template al form")
+            _click(page, "Applica template")
             _fill(page, "ID Name", "Dal browser")
             _click(page, "Avanti: componi le righe →")
 

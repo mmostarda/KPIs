@@ -12,14 +12,20 @@ L'app MATLAB resta nella cartella superiore e non è stata modificata.
 
 ## Installazione (Windows)
 
-Serve Python 3.11 o superiore.
+Serve Python 3.10 o superiore (testato con 3.10, 3.11, 3.12 e 3.13). `py -0` elenca le versioni installate.
 
-```bat
+In PowerShell:
+
+```powershell
 cd python
-py -3.11 -m venv .venv
-.venv\Scripts\activate
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
+
+- Se PowerShell blocca `Activate.ps1` ("esecuzione di script disabilitata"), esegui una volta `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+- Nel Prompt dei comandi (cmd) l'attivazione è `.venv\Scripts\activate.bat`.
+- Se è già attivo un altro ambiente (il prompt inizia con `(.venv)`), esegui prima `deactivate`.
 
 ## Primo avvio
 
@@ -75,8 +81,8 @@ I dati demo sono **sintetici**: servono a provare lo strumento, non a validarlo.
 |---|---|
 | 1 · DB | Legge il DB senza modificarlo. Mostra righe, prossimo ID, KPI, template e controlli di coerenza (ID, duplicati, Metadata ↔ KPIs). I problemi bloccanti disabilitano la scrittura. |
 | 2 · Sorgente | Quattro sorgenti possibili: **output LoLa** (cartella, scelta dei file, mapping); **Excel Metadata + KPI** (per esempio `Metadata_ALL_DB.xlsx`); **nuovo test** (una riga); **modifica di un ID esistente**. |
-| 3 · Metadati comuni | Form generato dallo schema, con le schede General e IC. Le tendine prendono i valori dai fogli di supporto del DB; il pulsante "+" aggiunge un valore al foglio. Si possono applicare template da `Metadata_Templates` e importare o esportare il form come Excel di una riga. Opzioni: sovrascrivere o solo riempire, dedurre i dati dal nome file, applicare un template per riga. |
-| 4 · Revisione | Tabella modificabile, con i problemi indicati riga per riga e ricontrollati a ogni modifica. Filtro "solo righe con problemi", scelta delle colonne visibili, pulsante "Accetta come vuoti i valori non validi". C'è anche il download Excel nel formato `Metadata_ALL_DB`, da modificare in Excel e reimportare al passo 2. |
+| 3 · Metadati | Form generato dallo schema, con le schede General e IC. Le tendine prendono i valori dai fogli di supporto del DB; il pulsante "+" aggiunge un valore al foglio. Si possono applicare template da `Metadata_Templates` e importare o esportare il form come Excel di una riga. Opzioni: sovrascrivere o solo riempire, dedurre i dati dal nome file, applicare un template per riga. |
+| 4 · Revisione | Tabella modificabile, con i problemi indicati riga per riga e ricontrollati a ogni modifica. Filtri "solo righe con problemi" e "solo colonne con problemi", scelta delle colonne visibili, pulsante "Accetta come vuoti i valori non validi". I valori che mancano da un foglio di supporto (Brand, Cluster…) si aggiungono al foglio da qui, senza tornare al passo 3. C'è anche il download Excel nel formato `Metadata_ALL_DB`, da modificare in Excel e reimportare al passo 2. |
 | 5 · Scrittura | Per i KPI assenti da `TableKPI` si sceglie: nuova colonna, colonna esistente oppure scarta. Poi anteprima, backup e una sola scrittura per entrambe le tabelle. |
 
 **Precedenza dei valori:** colonne protette della sorgente (`Repetition_ID`, `FileName`, `StartSpeed` se valido) > nome file > template > form. È la regola di `writeMetadataToNewALLDB.m`. I campi vuoti non sovrascrivono nulla.

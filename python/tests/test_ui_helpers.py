@@ -3,7 +3,9 @@ import datetime as dt
 import pandas as pd
 
 from kpimeta.batch import batch_from_frame, batch_manual
+from kpimeta.issues import ERROR, WARNING, Issue
 from kpimeta.ui_helpers import (PROBLEMS_COL, apply_edits, diff_frame, display_frame, field_value, form_defaults,
+                                missing_support_values,
                                 one_row_excel_bytes, values_to_widgets, widget_key, widget_value)
 
 
@@ -50,3 +52,12 @@ def test_diff_and_export(schema):
                       {"IDName": "b", "Date": dt.date(2026, 3, 5)})
     assert list(diff["Colonna"]) == ["IDName"]  # same date in another format is not a change
     assert one_row_excel_bytes({"IDName": "x", "Date": dt.date(2026, 3, 5)})[:2] == b"PK"
+
+
+def test_missing_support_values(schema):
+    issues = [Issue(WARNING, "'Brand Z' non è nel foglio Brand", 0, "Brand", "Brand Z"),
+              Issue(WARNING, "'Brand Z' non è nel foglio Brand", 2, "Brand", "Brand Z"),
+              Issue(ERROR, "'X' non è nella lista", 1, "ABS", "X"),  # fixed list, no support sheet
+              Issue(ERROR, "valore non valido", 1, "KPI_A", "n.a.")]
+    assert missing_support_values(issues, schema, {"Brand": ["Brand X"]}) == {("Brand", "Brand Z"): [0, 2]}
+    assert missing_support_values(issues, schema, {"Brand": ["Brand X", "Brand Z"]}) == {}
