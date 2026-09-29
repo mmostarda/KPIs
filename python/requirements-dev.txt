@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8
+# test nel browser (facoltativo, vedi tests/test_browser.py):
+#   pip install playwright && playwright install chromium
