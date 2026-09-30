@@ -8,10 +8,19 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import sys
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
+
+st.set_page_config(page_title="KPI metadata", page_icon="📊", layout="wide")
+# the first start loads pandas & co. (tens of seconds on a PC with an antivirus): say so
+# instead of showing an empty page; the imports below come after this on purpose
+_loading = None if "kpimeta.excel_db" in sys.modules else st.empty()
+if _loading is not None:
+    _loading.info("Avvio in corso: caricamento delle librerie (al primo avvio può richiedere un minuto)…")
+
+import pandas as pd
 
 from kpimeta.batch import (BatchError, assign_ids, batch_from_excel, batch_from_frame, batch_manual, compose,
                            read_excel_table)
@@ -39,7 +48,8 @@ SOURCES = {
 CHOOSE, ADD, DISCARD, MAP = "— scegli —", "Aggiungi come nuova colonna", "Scarta", "→ "
 DATE_MIN, DATE_MAX = dt.date(1900, 1, 1), dt.date(2100, 12, 31)
 
-st.set_page_config(page_title="KPI metadata", page_icon="📊", layout="wide")
+if _loading is not None:
+    _loading.empty()
 ss = st.session_state
 
 

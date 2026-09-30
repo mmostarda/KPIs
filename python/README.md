@@ -83,7 +83,7 @@ Ogni collega:
 1. la copia sul proprio PC;
 2. fa doppio clic su `Avvia KPI metadata.bat`.
 
-L'app gira sul PC del collega e il browser si collega solo a quel PC (`http://localhost:8501`). Non ci sono link da condividere né porte aperte sulla rete, e non servono installazioni né permessi di amministratore.
+L'app gira sul PC del collega e il browser si collega solo a quel PC (`http://127.0.0.1:8501`). Non ci sono link da condividere né porte aperte sulla rete, e non servono installazioni né permessi di amministratore.
 
 Per creare la cartella, sul tuo PC:
 
