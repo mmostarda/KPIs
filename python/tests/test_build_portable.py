@@ -12,7 +12,7 @@ def test_app_copy_is_served_to_this_pc_only(tmp_path):
     bp.copy_app(tmp_path / "app")
     config = (tmp_path / "app" / ".streamlit" / "config.toml").read_text(encoding="utf-8")
     server = tomllib.loads(config)["server"]
-    assert server["address"] == "localhost" and server["showEmailPrompt"] is False
+    assert server["address"] == "127.0.0.1" and server["showEmailPrompt"] is False
     assert (tmp_path / "app" / "kpimeta" / "__init__.py").exists()
     assert (tmp_path / "app" / "config" / "schema_metadata.csv").exists()
     assert not list((tmp_path / "app").rglob("__pycache__"))

@@ -4,7 +4,7 @@ The build copies the Python that runs this script (without its packages), instal
 libraries of requirements.txt into the copy and adds the app and a launcher:
 
     KPI_metadata/
-        Avvia KPI metadata.bat   double click: the app opens in the browser (http://localhost:8501)
+        Avvia KPI metadata.bat   double click: the app opens in the browser (http://127.0.0.1:8501)
         kpimeta.bat              command line (python -m kpimeta ...)
         LEGGIMI.txt
         app/                     app.py, kpimeta/, config/ (schema, settings, LoLa mapping)
@@ -16,7 +16,7 @@ Build it on Windows from the python/ folder, with a Python installed from python
     py -3.12 build_portable.py
 
 Result: dist/KPI_metadata/ and dist/KPI_metadata.zip. Each colleague runs the app on their own
-PC and the browser talks only to that PC (localhost): nothing is reachable from the network.
+PC and the browser talks only to that PC (127.0.0.1): nothing is reachable from the network.
 """
 
 from __future__ import annotations
@@ -36,8 +36,9 @@ OPTIONAL_REQUIREMENTS = ("scipy",)  # only to convert the old .mat mapping
 
 SERVER_CONFIG = """
 [server]
-# served to this PC only: not reachable from the network, no firewall prompt
-address = "localhost"
+# served to this PC only: not reachable from the network, no firewall prompt. 127.0.0.1 and
+# not "localhost": on Windows localhost is tried first as IPv6 (::1), where nothing listens
+address = "127.0.0.1"
 showEmailPrompt = false
 fileWatcherType = "none"
 """
@@ -83,11 +84,12 @@ Non serve installare nulla e non servono permessi di amministratore.
    Da una cartella di rete funziona, ma l'avvio è molto più lento.
 2. Doppio clic su "Avvia KPI metadata.bat".
    Si apre una finestra nera: lasciala aperta. Dopo qualche secondo il browser mostra l'app.
-   L'indirizzo http://localhost:8501 è servito dal tuo PC: non passa dalla rete
+   L'indirizzo http://127.0.0.1:8501 è servito dal tuo PC: non passa dalla rete
    (se hai già l'app aperta, la seconda usa 8502).
 3. Per chiudere l'app chiudi la finestra nera.
 
-Il primo avvio può richiedere fino a un minuto (controllo dell'antivirus).
+Il primo avvio può richiedere fino a un minuto (controllo dell'antivirus): la pagina
+mostra "Avvio in corso". Se resta vuota, attendi e premi F5.
 Se qualcosa non va, la finestra nera mostra il messaggio d'errore.
 
 File utili
