@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
 
-from .batch import Batch, export_batch_excel, set_value
+from .batch import INFERENCE_METHODS, Batch, export_batch_excel, set_value
 from .issues import ERROR, INFO, WARNING, Issue
 from .schema import Field, Schema
 from .values import ConversionError, canonical, is_missing, split_multi, to_date, to_int, to_number, to_text
@@ -89,19 +90,18 @@ def display_frame(batch: Batch, schema: Schema, problems: dict[int, str], rows: 
     data[PROBLEMS_COL] = pd.Series([problems.get(r, "") for r in rows], index=index, dtype="string")
     columns = batch.review_columns() + ([SOURCE_COL] if SOURCE_COL in batch.df.columns else [])
     for column in columns:
-        values = [batch.df.at[r, column] for r in rows]
-        kind = _kind(batch, schema, column)
-        if kind in ("int", "id"):
-            series = pd.Series([to_int_safe(v) for v in values], index=index, dtype="Int64")
-        elif kind == "number":
-            series = pd.Series([to_float_safe(v) for v in values], index=index, dtype="float64")
-        elif kind == "date":
-            series = pd.Series(pd.to_datetime([v if isinstance(v, dt.date) else None for v in values]),
-                               index=index)
-        else:
-            series = pd.Series([to_text(v) for v in values], index=index, dtype="string")
-        data[column] = series
+        data[column] = _display_series([batch.df.at[r, column] for r in rows], _kind(batch, schema, column), index)
     return pd.DataFrame(data, index=index)
+
+
+def _display_series(values: list[Any], kind: str | None, index: pd.Index) -> pd.Series:
+    if kind in ("int", "id"):
+        return pd.Series([to_int_safe(v) for v in values], index=index, dtype="Int64")
+    if kind == "number":
+        return pd.Series([to_float_safe(v) for v in values], index=index, dtype="float64")
+    if kind == "date":
+        return pd.Series(pd.to_datetime([v if isinstance(v, dt.date) else None for v in values]), index=index)
+    return pd.Series([to_text(v) for v in values], index=index, dtype="string")
 
 
 def to_int_safe(value: Any) -> int | None:
@@ -130,10 +130,90 @@ def apply_edits(batch: Batch, schema: Schema, view_rows: list[int], edited_rows:
         for column, value in changes.items():
             if column in (PROBLEMS_COL, SOURCE_COL, id_column) or column not in result.df.columns:
                 continue
-            kind = _kind(result, schema, column)
-            if isinstance(value, str) and kind == "date" and "T" in value:
-                value = value.split("T")[0]
-            set_value(result, row, column, value, kind, "edit")
+            _set_edit(result, schema, row, column, value)
+    return result
+
+
+def _set_edit(batch: Batch, schema: Schema, row: int, column: str, value: Any) -> None:
+    kind = _kind(batch, schema, column)
+    if isinstance(value, str) and kind == "date" and "T" in value:
+        value = value.split("T")[0]
+    set_value(batch, row, column, value, kind, "edit")
+
+
+# --- values inferred automatically (file name, per-row template, ...) ----------------------
+
+FILE_COL, ROWS_COL, FROM_COL, MIXED_COL = "File", "Righe", "Dedotti da", "Valori diversi"
+INFERRED_INFO_COLUMNS = (FILE_COL, ROWS_COL, FROM_COL, MIXED_COL)
+
+
+@dataclass
+class InferredGroup:
+    """The rows of one file (its repetitions): inference works on the file name."""
+    name: str
+    rows: list[int]
+    methods: list[str]  # inference methods that filled something in these rows
+
+
+def inferred_columns(batch: Batch) -> list[str]:
+    """Columns an inference method can fill, in review order."""
+    targets = {c for columns in batch.inference_columns.values() for c in columns}
+    return [c for c in batch.review_columns() if c in targets]
+
+
+def inferred_groups(batch: Batch) -> list[InferredGroup]:
+    """One group per file name (every file, also those whose name was not recognized)."""
+    if not batch.inference_columns:
+        return []
+    by_row: dict[int, set[str]] = {}
+    for (row, _), method in batch.inferred.items():
+        by_row.setdefault(row, set()).add(method)
+    has_file = "FileName" in batch.df.columns
+    groups: dict[str, InferredGroup] = {}
+    for r in range(batch.n_rows):
+        name = (to_text(batch.df.at[r, "FileName"]) if has_file else None) or f"riga {r + 1}"
+        group = groups.setdefault(name, InferredGroup(name, [], []))
+        group.rows.append(r)
+        group.methods += [m for m in INFERENCE_METHODS if m in by_row.get(r, ()) and m not in group.methods]
+    return list(groups.values())
+
+
+def _rows_text(rows: list[int]) -> str:
+    numbers = [r + 1 for r in rows]
+    if len(numbers) > 2 and numbers == list(range(numbers[0], numbers[-1] + 1)):
+        return f"{numbers[0]}–{numbers[-1]}"
+    return ", ".join(str(n) for n in numbers)
+
+
+def inferred_frame(batch: Batch, schema: Schema, columns: list[str], groups: list[InferredGroup]) -> pd.DataFrame:
+    """Table of the inferred values, one row per file (the value of its first row)."""
+    index = pd.RangeIndex(len(groups))
+    mixed = [[c for c in columns if len({to_text(batch.df.at[r, c]) for r in g.rows}) > 1] for g in groups]
+    data = {
+        FILE_COL: pd.Series([g.name for g in groups], index=index, dtype="string"),
+        ROWS_COL: pd.Series([_rows_text(g.rows) for g in groups], index=index, dtype="string"),
+        FROM_COL: pd.Series([", ".join(INFERENCE_METHODS[m] for m in g.methods) or "nessun valore dedotto"
+                             for g in groups], index=index, dtype="string"),
+        MIXED_COL: pd.Series([", ".join(m) for m in mixed], index=index, dtype="string"),
+    }
+    for column in columns:
+        data[column] = _display_series([batch.df.at[g.rows[0], column] for g in groups],
+                                       _kind(batch, schema, column), index)
+    return pd.DataFrame(data, index=index)
+
+
+def apply_group_edits(batch: Batch, schema: Schema, groups: list[InferredGroup], edited_rows: dict) -> Batch:
+    """Edits of the inferred-values table: each value goes to every row of its file."""
+    if not edited_rows:
+        return batch
+    result = batch.copy()
+    for position, changes in edited_rows.items():
+        group = groups[int(position)]
+        for column, value in changes.items():
+            if column in INFERRED_INFO_COLUMNS or column not in result.df.columns:
+                continue
+            for row in group.rows:
+                _set_edit(result, schema, row, column, value)
     return result
 
 

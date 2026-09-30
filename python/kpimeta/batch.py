@@ -10,6 +10,9 @@ compose(). Precedence, from strongest to weakest:
   LoLa protected columns (Repetition_ID, FileName; StartSpeed when valid)
   > file-name inference > template > form > values already in the source.
 Empty values never overwrite anything.
+
+Each automatic inference method (INFERENCE_METHODS) records the columns it can fill
+and the cells it filled, so that the review can show and edit them file by file.
 """
 
 from __future__ import annotations
@@ -32,6 +35,9 @@ from .xlsx import open_workbook
 LEAD_COLUMNS = ("ID", "Repetition_ID", "FileName", "StartSpeed")  # MATLAB column order
 HIDDEN_PREFIX = "_"  # informative columns, never written (e.g. _source_file)
 KPI_TYPE = "number"
+# automatic inference methods: origin -> label shown in the review. A new method
+# calls track_inference() and record_inferred() and its values become editable there.
+INFERENCE_METHODS = {"filename": "nome file", "template": "template per riga"}
 
 
 class BatchError(Exception):
@@ -47,6 +53,8 @@ class Batch:
     conv_issues: dict[tuple[int, str], tuple[str, str]] = field(default_factory=dict)
     notes: list[Issue] = field(default_factory=list)
     origin: dict[tuple[int, str], str] = field(default_factory=dict)
+    inferred: dict[tuple[int, str], str] = field(default_factory=dict)  # cell -> method (kept after edits)
+    inference_columns: dict[str, list[str]] = field(default_factory=dict)  # method -> columns it can fill
 
     @property
     def n_rows(self) -> int:
@@ -60,7 +68,8 @@ class Batch:
 
     def copy(self) -> "Batch":
         return Batch(self.df.copy(deep=True), list(self.meta_columns), list(self.kpi_columns),
-                     self.source, dict(self.conv_issues), copy.deepcopy(self.notes), dict(self.origin))
+                     self.source, dict(self.conv_issues), copy.deepcopy(self.notes), dict(self.origin),
+                     dict(self.inferred), {k: list(v) for k, v in self.inference_columns.items()})
 
 
 def _meta_order(schema: Schema, extra: list[str]) -> list[str]:
@@ -88,6 +97,18 @@ def set_value(batch: Batch, row: int, column: str, raw: Any, field_type: str | N
         batch.notes.append(Issue(WARNING, warning, row, column, raw))
     if value is not None:
         batch.origin[(row, column)] = origin
+
+
+def track_inference(batch: Batch, method: str, columns: list[str]) -> None:
+    """Declare the columns an inference method can fill (even if it fills nothing)."""
+    known = batch.inference_columns.setdefault(method, [])
+    known.extend(c for c in columns if c in batch.df.columns and c not in known)
+
+
+def record_inferred(batch: Batch, row: int, column: str, method: str) -> None:
+    """Remember that an inference method filled this cell (also when the value is invalid)."""
+    if batch.df.at[row, column] is not None or (row, column) in batch.conv_issues:
+        batch.inferred[(row, column)] = method
 
 
 def _classify(columns: list[str], schema: Schema, settings: Settings,
@@ -245,6 +266,7 @@ def apply_templates(batch: Batch, schema: Schema, settings: Settings, templates:
         if text:
             index.setdefault(text.lower(), i)
     missing: dict[str, list[int]] = {}
+    filled: list[str] = []  # columns set by at least one template
     applied = 0
     for r in range(batch.n_rows):
         name = template_name(batch.df.at[r, "FileName"], settings)
@@ -268,6 +290,8 @@ def apply_templates(batch: Batch, schema: Schema, settings: Settings, templates:
                     batch.meta_columns.append(tcol)
                 batch.df.at[r, tcol] = native(raw)
                 batch.origin[(r, tcol)] = "template"
+                record_inferred(batch, r, tcol, "template")
+                filled.append(tcol)
                 continue
             if f.type == "id" or f.lola_policy == "keep":
                 continue
@@ -276,6 +300,9 @@ def apply_templates(batch: Batch, schema: Schema, settings: Settings, templates:
                     and current_origin in ("lola", "excel")):
                 continue
             set_value(batch, r, f.column, raw, f.type, "template")
+            record_inferred(batch, r, f.column, "template")
+            filled.append(f.column)
+    track_inference(batch, "template", list(dict.fromkeys(filled)))
     for name, rows in missing.items():
         batch.notes.append(Issue(WARNING, f"template '{name}' non trovato in {settings.templates_sheet}: "
                                           f"{len(rows)} righe restano con i valori del form",
@@ -287,6 +314,7 @@ def apply_filename_inference(batch: Batch, schema: Schema, settings: Settings) -
     """Date, Driving_Mode, ManeuvreName, Driver from FileName. Returns rows inferred."""
     if "FileName" not in batch.df.columns:
         return 0
+    track_inference(batch, "filename", list(settings.filename_tokens))
     inferred = 0
     for r in range(batch.n_rows):
         values, problem = infer_from_filename(batch.df.at[r, "FileName"], settings, schema)
@@ -298,6 +326,7 @@ def apply_filename_inference(batch: Batch, schema: Schema, settings: Settings) -
             f = schema.get(column)
             if f is not None and column in batch.df.columns:
                 set_value(batch, r, column, value, f.type, "filename")
+                record_inferred(batch, r, column, "filename")
     return inferred
 
 

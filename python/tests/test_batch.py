@@ -97,3 +97,17 @@ def test_manual_batch(schema):
     batch = batch_manual(schema, {"IDName": "one", "Date": dt.date(2026, 1, 2), "ABS": "OFF"}, ["KPI_A"])
     assert batch.n_rows == 1
     assert batch.df.at[0, "ABS"] == "OFF" and batch.kpi_columns == ["KPI_A"]
+
+
+def test_inference_is_tracked(lola_batch, schema, settings):
+    base, snapshot = lola_batch
+    batch = compose(base, schema, settings, {"Driver": "Form"}, templates=snapshot.templates,
+                    infer_template=True, infer_filename=True)
+    # the file-name rule declares all its columns, also when a name is not recognised
+    assert batch.inference_columns["filename"] == ["Date", "Driving_Mode", "ManeuvreName", "Driver"]
+    assert batch.inferred[(0, "Driver")] == "filename"
+    assert (7, "Driver") not in batch.inferred  # 'shortname.mf4': the form value stays
+    assert batch.inferred[(0, "Brand")] == "template" and "Brand" in batch.inference_columns["template"]
+    assert (6, "Brand") not in batch.inferred  # PRJ9_VEH9: no template
+    edited = batch.copy()
+    assert edited.inferred == batch.inferred and edited.inference_columns == batch.inference_columns

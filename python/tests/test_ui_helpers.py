@@ -2,10 +2,13 @@ import datetime as dt
 
 import pandas as pd
 
-from kpimeta.batch import batch_from_frame, batch_manual
+from kpimeta.batch import batch_from_frame, batch_manual, compose
 from kpimeta.issues import ERROR, WARNING, Issue
-from kpimeta.ui_helpers import (PROBLEMS_COL, apply_edits, diff_frame, display_frame, field_value, form_defaults,
-                                missing_support_values,
+from kpimeta.lola import read_lola_files
+from kpimeta.mapping import load_mapping
+from kpimeta.ui_helpers import (FROM_COL, MIXED_COL, PROBLEMS_COL, ROWS_COL, apply_edits, apply_group_edits,
+                                diff_frame, display_frame, field_value, form_defaults, inferred_columns,
+                                inferred_frame, inferred_groups, missing_support_values,
                                 one_row_excel_bytes, values_to_widgets, widget_key, widget_value)
 
 
@@ -61,3 +64,25 @@ def test_missing_support_values(schema):
               Issue(ERROR, "valore non valido", 1, "KPI_A", "n.a.")]
     assert missing_support_values(issues, schema, {"Brand": ["Brand X"]}) == {("Brand", "Brand Z"): [0, 2]}
     assert missing_support_values(issues, schema, {"Brand": ["Brand X", "Brand Z"]}) == {}
+
+
+def test_inferred_values_are_edited_per_file(demo, schema, settings):
+    frame, _ = read_lola_files(demo["lola"], load_mapping(demo["mapping"]), settings)
+    batch = compose(batch_from_frame(frame, schema, settings, "lola"), schema, settings, {}, infer_filename=True)
+    columns, groups = inferred_columns(batch), inferred_groups(batch)
+    assert columns == ["Date", "ManeuvreName", "Driving_Mode", "Driver"]
+    assert [g.rows for g in groups] == [[0, 1, 2], [3, 4], [5], [6], [7]]  # one group per file
+    assert groups[4].name == "shortname.mf4" and groups[4].methods == []  # not recognised: filled by hand
+    table = inferred_frame(batch, schema, columns, groups)
+    assert table.at[0, "Driver"] == "DriverA" and table.at[0, ROWS_COL] == "1–3"
+    assert table.at[0, FROM_COL] == "nome file" and table.at[4, FROM_COL] == "nessun valore dedotto"
+
+    edited = apply_group_edits(batch, schema, groups, {"0": {"Driver": "Mario", "File": "ignored"},
+                                                       "4": {"Date": "2026-05-02T00:00:00.000"}})
+    assert [edited.df.at[r, "Driver"] for r in range(4)] == ["Mario", "Mario", "Mario", "DriverB"]
+    assert edited.df.at[7, "Date"] == dt.date(2026, 5, 2)
+    assert edited.origin[(0, "Driver")] == "edit" and batch.df.at[0, "Driver"] == "DriverA"
+    assert [g.rows for g in inferred_groups(edited)] == [g.rows for g in groups]  # same table after edits
+
+    one_row = apply_edits(batch, schema, list(range(batch.n_rows)), {"1": {"Driver": "Other"}})
+    assert inferred_frame(one_row, schema, columns, inferred_groups(one_row)).at[0, MIXED_COL] == "Driver"

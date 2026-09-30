@@ -85,20 +85,25 @@ def _chips(page) -> list[str]:
             for c in page.locator('[data-testid="stMultiSelectTagsContainer"] [data-tag]').all()]
 
 
-def _edit_cell(page, row: int, column: str, text: str) -> None:
-    """Select the '⚠ Problemi' cell of the row, move right to the column and type the value
-    (typing on a selected cell opens its editor). Each step waits for the grid focus: a key
-    pressed while the grid is still busy can be lost."""
-    target = _chips(page).index(column) + 2  # grid columns: riga, ⚠ Problemi, visible columns
-    box = page.locator('[data-testid="stDataFrame"]').first.bounding_box()
-    page.mouse.click(box["x"] + 100, box["y"] + 35 * row + 17)  # header and rows are 35 px high
-    for position in range(1, target + 1):
-        if position > 1:
+def _edit_cell(page, row: int, target: int, text: str, grid: int = 0) -> None:
+    """Select the first cell of the row, move right to the column `target` (0 = first column of
+    the grid) and type the value (typing on a selected cell opens its editor). Each step waits
+    for the grid focus: a key pressed while the grid is still busy can be lost."""
+    table = page.locator('[data-testid="stDataFrame"]').nth(grid)
+    table.scroll_into_view_if_needed()
+    box = table.bounding_box()
+    x, y = box["x"] + 20, box["y"] + 35 * row + 17  # header and rows are 35 px high
+    page.mouse.click(x, y)
+    page.wait_for_timeout(300)
+    if page.evaluate("() => document.activeElement?.id") != f"glide-cell-0-{row - 1}":
+        page.mouse.click(x, y)  # while another grid has a selection, the first click only activates this one
+    for position in range(target + 1):
+        if position:
             page.keyboard.press("ArrowRight")
         page.wait_for_function(f"() => document.activeElement?.id === 'glide-cell-{position}-{row - 1}'")
     page.wait_for_timeout(300)  # the grid scrolls to the selected cell
     page.keyboard.type(text[0])
-    editor = page.locator("input.gdg-input")
+    editor = page.locator(".gdg-input")  # input for numbers, textarea for text
     editor.wait_for()
     editor.fill(text)
     editor.press("Enter")
@@ -134,13 +139,18 @@ def test_grid_edit_reaches_the_db(server, demo):
             _click(page, "Avanti: componi le righe →")
 
             expect(_metric(page, "Errori")).to_have_text("1")  # 'n.a.' in KPI_C of row 1
-            _edit_cell(page, 1, "KPI_C", "7.7")
+            _edit_cell(page, 1, _chips(page).index("KPI_C") + 2, "7.7")  # columns: riga, ⚠ Problemi, ...
             expect(_metric(page, "Errori")).to_have_text("0")
             # the grid reports only the edits of visible columns: hiding KPI_C and editing
             # another cell must not lose the first edit
             page.get_by_role("button", name="Remove KPI_C", exact=True).click()
             _idle(page)
-            _edit_cell(page, 2, "KPI_B", "99")
+            _edit_cell(page, 2, _chips(page).index("KPI_B") + 2, "99")
+            expect(_metric(page, "Errori")).to_have_text("0")
+            # values inferred from the file name, edited once for all the rows of the first file
+            # (columns: File, Righe, Dedotti da, Valori diversi, Date, ManeuvreName, Driving_Mode, Driver);
+            # the pending edit of KPI_B is committed with it
+            _edit_cell(page, 1, 7, "Mario", grid=1)
             expect(_metric(page, "Errori")).to_have_text("0")
 
             page.locator('[data-testid="stSidebar"]').get_by_text("5 · Scrittura").click()
@@ -151,7 +161,11 @@ def test_grid_edit_reaches_the_db(server, demo):
         finally:
             browser.close()
 
-    rows = list(load_workbook(demo["db"])["KPIs"].iter_rows(values_only=True))
+    wb = load_workbook(demo["db"])
+    rows = list(wb["KPIs"].iter_rows(values_only=True))
     records = {r[0]: dict(zip(rows[0], r)) for r in rows[1:]}
     assert records[3]["KPI_C"] == 7.7 and records[3]["IDName"] == "Dal browser"
     assert records[4]["KPI_B"] == 99
+    rows = list(wb["Metadata"].iter_rows(values_only=True))
+    drivers = {r[0]: dict(zip(rows[0], r))["Driver"] for r in rows[1:]}
+    assert [drivers[i] for i in (3, 4, 5, 6)] == ["Mario", "Mario", "Mario", "DriverB"]

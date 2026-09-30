@@ -31,9 +31,11 @@ from kpimeta.issues import ERROR, INFO, WARNING
 from kpimeta.lola import LolaError, export_all_db, is_lola_output, read_lola_files
 from kpimeta.mapping import MappingError, load_mapping
 from kpimeta.schema import load_schema
-from kpimeta.ui_helpers import (PROBLEMS_COL, SOURCE_COL, apply_edits, batch_excel_bytes, diff_frame,
-                                display_frame, field_value, form_defaults, issues_frame, missing_support_values,
-                                one_row_excel_bytes, problems_text, values_to_widgets, widget_key)
+from kpimeta.ui_helpers import (FILE_COL, FROM_COL, MIXED_COL, PROBLEMS_COL, ROWS_COL, SOURCE_COL,
+                                apply_edits, apply_group_edits, batch_excel_bytes, diff_frame, display_frame,
+                                field_value, form_defaults, inferred_columns, inferred_frame, inferred_groups,
+                                issues_frame, missing_support_values, one_row_excel_bytes, problems_text,
+                                values_to_widgets, widget_key)
 from kpimeta.validate import (KpiDecision, canonicalize_choices, check_decisions, duplicates_vs_db,
                               internal_duplicates, kpi_resolution, validate_batch)
 from kpimeta.values import is_missing, to_text
@@ -617,6 +619,10 @@ def editor_key() -> str:
     return f"editor::{ss.editor_version}"
 
 
+def inferred_key() -> str:
+    return f"inferred::{ss.editor_version}"
+
+
 def view_rows() -> list[int]:
     return ss.view_rows if ss.view_rows is not None else list(range(ss.batch.n_rows))
 
@@ -637,6 +643,15 @@ def batch_issues(batch):
 def commit_edits() -> None:
     if ss.batch is not None:
         ss.batch = current_batch()
+    ss.editor_version += 1
+
+
+def apply_inferred_edits() -> None:
+    """An edit of the inferred-values table goes at once to every row of the file; the
+    pending edits of the main table are committed with it (both tables are re-created)."""
+    edited = (ss.get(inferred_key()) or {}).get("edited_rows") or {}
+    current = current_batch()
+    ss.batch = apply_group_edits(current, schema, inferred_groups(current), edited)
     ss.editor_version += 1
 
 
@@ -772,9 +787,28 @@ def step_review() -> None:
     # grid drops every edit equal to the new cell value, so feeding the edits back would erase them
     display = display_frame(ss.batch, schema, problems_text(issues), view_rows(), settings.id_column)
     extra = [SOURCE_COL] if SOURCE_COL in display.columns else []
-    st.data_editor(display, key=editor_key(), num_rows="fixed", column_config=column_config(current),
+    config = column_config(current)
+    st.data_editor(display, key=editor_key(), num_rows="fixed", column_config=config,
                    column_order=[PROBLEMS_COL, *[c for c in all_columns if c in chosen], *extra],
                    height=min(600, 38 + 35 * len(display)), placeholder="—")
+    inferred, groups = inferred_columns(current), inferred_groups(current)
+    if inferred and groups:
+        with st.expander("Valori dedotti automaticamente (modificabili per file)", expanded=True):
+            st.caption(f"{len(groups)} file. Valori dedotti dal nome file o dal template per riga: una modifica "
+                       "qui vale per tutte le righe (le ripetizioni) dello stesso file.")
+            inferred_config = {c: v for c, v in config.items() if c in inferred}
+            inferred_config.update({
+                FILE_COL: st.column_config.TextColumn(FILE_COL, disabled=True, width="large"),
+                ROWS_COL: st.column_config.TextColumn(ROWS_COL, disabled=True, help="righe della tabella sopra"),
+                FROM_COL: st.column_config.TextColumn(FROM_COL, disabled=True),
+                MIXED_COL: st.column_config.TextColumn(MIXED_COL, disabled=True,
+                                                       help="colonne con valori diversi tra le righe del file: "
+                                                            "qui compare quello della prima riga"),
+            })
+            frame = inferred_frame(current, schema, inferred, groups)
+            st.data_editor(frame, key=inferred_key(), num_rows="fixed", hide_index=True,
+                           column_config=inferred_config, on_change=apply_inferred_edits,
+                           height=min(400, 38 + 35 * len(frame)), placeholder="—")
     missing = missing_support_values(issues, schema, options())
     if missing:
         with st.container(border=True):
